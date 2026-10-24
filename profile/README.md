@@ -2,7 +2,7 @@
 
 **Your workspace, supercharged. Local-first, zero-config, built to be extended.**
 
-Brokspace (`brok`) makes a development workspace more productive for individuals and teams. It indexes your code (including nested git submodules) into a local hybrid search engine, connects it to the LLM you choose (Ollama, LM Studio or a hosted provider), and plugs it into the coding agents you already use. Everything runs on your machine.
+Brokspace (`brok`) makes a development workspace more productive for individuals and teams. It indexes your code (a single repository, its submodules, or a whole folder of repositories) into a local hybrid search engine, connects it to the LLM you choose (Ollama, LM Studio or a hosted provider), and plugs it into the coding agents you already use. Everything runs on your machine.
 
 The platform is built around two ideas:
 
@@ -18,17 +18,22 @@ curl -fsSL https://raw.githubusercontent.com/brokspace/brok/main/scripts/install
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/brokspace/brok/main/scripts/install.ps1 | iex
 
-# then, inside any repository
+# then, inside any repository (or a folder of repositories)
 brok init
 ```
+
+Managed Windows machines may block the script; the
+[README](https://github.com/brokspace/brok#install) explains the manual install.
 
 `brok init` sets everything up: it detects a local LLM (or tells you how to get one for your hardware), downloads the embedding model, installs the default agent and indexes the workspace. Then:
 
 ```sh
 brok search "where do we validate tokens"   # hybrid search over your code
-brok run                                    # live indexing + agent
-brok ask "how does the refresh flow work?"  # answers grounded in your code
-brok setup agents                           # skills + MCP for your coding agent
+brok ask "how does the refresh flow work?"  # answers grounded in your code (starts brok in the background)
+brok chat                                   # follow-up questions
+brok review                                 # AI review of your uncommitted changes
+git add -p && brok commit                   # commit message from the staged diff
+brok setup agents                           # skills + MCP for Claude Code, Cursor, VS Code, Codex
 ```
 
 ## Repositories
