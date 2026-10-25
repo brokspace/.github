@@ -36,6 +36,8 @@ git add -p && brok commit                   # commit message from the staged dif
 brok setup agents                           # skills + MCP for Claude Code, Cursor, VS Code, Codex
 ```
 
+New to Brokspace? The **[getting started guide](https://github.com/brokspace/brok/blob/main/docs/getting-started.md)** walks you through installation, your first workspace, daily use and configuration.
+
 ## Repositories
 
 | Repository | What it is |
