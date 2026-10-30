@@ -1,6 +1,6 @@
-# Brokspace
+![Brokspace: your workspace, understood. Local-first search, agents and skills for every developer.](https://raw.githubusercontent.com/brokspace/.github/main/profile/assets/banner.png)
 
-**Your workspace, supercharged. Local-first, zero-config, built to be extended.**
+**Your workspace, understood.** Local-first, zero-config, built to be extended.
 
 Brokspace (`brok`) makes a development workspace more productive for individuals and teams. It indexes your code (a single repository, its submodules, or a whole folder of repositories) into a local hybrid search engine, connects it to the LLM you choose (Ollama, LM Studio or a hosted provider), and plugs it into the coding agents you already use. Everything runs on your machine.
 
