@@ -46,6 +46,7 @@ New to Brokspace? The **[getting started guide](https://github.com/brokspace/bro
 | [brok-sdk](https://github.com/brokspace/brok-sdk) | Protocol, `shard.json` schema and Rust client for writing shards |
 | [brok-agent](https://github.com/brokspace/brok-agent) | The default system shard: change tracking, pre-indexation review, RAG answers |
 | [brok-shard-template](https://github.com/brokspace/brok-shard-template) | A ready-to-fork template for your own shard |
+| [example-nestjs](https://github.com/brokspace/example-nestjs) | A NestJS project set up with Brokspace, to try search, ask, review and commit |
 
 ## Build on Brokspace
 
