@@ -1,0 +1,64 @@
+# Reusable promotion for every Brokspace repository, called on each push to
+# staging (see workflow-templates/promote.yml). It:
+#
+#   1. sets the `staging` commit status on the new staging head. The main
+#      ruleset requires it, so main only takes commits that went through
+#      staging;
+#   2. opens the release PR staging -> main, or refreshes its description with
+#      the commits waiting to be released.
+#
+# Merging that PR (merge commit) is the release gate; tags are cut from main.
+name: Promote
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    name: promote
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      statuses: write
+    concurrency:
+      group: promote-${{ github.repository }}
+      cancel-in-progress: true
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      SHA: ${{ github.sha }}
+    steps:
+      - name: Mark the commit as promotable
+        run: |
+          gh api "repos/$REPO/statuses/$SHA" --silent \
+            -f state=success -f context=staging \
+            -f description="Went through staging: can be promoted to main"
+
+      - name: Open or refresh the release PR
+        run: |
+          compare=$(gh api "repos/$REPO/compare/main...$SHA")
+          ahead=$(jq -r .ahead_by <<<"$compare")
+          if [ "$ahead" = 0 ]; then
+            echo "staging has nothing main does not have"
+            exit 0
+          fi
+          {
+            echo "Promotes **$ahead** commit(s) from \`staging\` to \`main\`."
+            echo
+            jq -r '.commits[] | select(.parents | length == 1) | "- \(.commit.message | split("\n")[0]) (\(.sha[0:7]))"' <<<"$compare"
+            echo
+            echo "Merge with **Create a merge commit** once the checks are green. Then cut a release from \`main\` if needed."
+            echo
+            echo "<sub>Kept up to date by the Promote workflow.</sub>"
+          } > body.md
+          number=$(gh pr list --repo "$REPO" --base main --head staging --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --repo "$REPO" --body-file body.md
+            echo "Refreshed #$number"
+          else
+            gh pr create --repo "$REPO" --base main --head staging \
+              --title "release: promote staging to main" --body-file body.md --label release
+          fi

@@ -1,0 +1,6 @@
+{
+  "name": "Brokspace PR policy",
+  "description": "Conventional Commits title, staging-first targets and the ai-agent label.",
+  "iconName": "octicon git-pull-request",
+  "categories": ["Automation"]
+}

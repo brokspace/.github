@@ -1,0 +1,67 @@
+# Reusable PR checks for every Brokspace repository. Each repository calls it
+# from .github/workflows/pr-policy.yml (see workflow-templates/).
+#
+#   title  Conventional Commits title: it becomes the squash commit on staging.
+#          Required by the staging ruleset.
+#   base   main only takes the promotion PR from staging.
+#   label  Adds `ai-agent` when a commit has an AI co-author trailer.
+name: PR policy
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conventional Commits title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|release)(\([A-Za-z0-9._/-]+\))?!?: [^ ]'
+          if [[ "$TITLE" =~ $pattern ]]; then
+            echo "Title OK: $TITLE"
+          else
+            echo "::error::PR title \"$TITLE\" must follow Conventional Commits, for example \"feat(index): add Kotlin chunker\" or \"fix: handle empty brok.yml\". Edit the title; this check runs again."
+            exit 1
+          fi
+
+  base:
+    name: base
+    runs-on: ubuntu-latest
+    steps:
+      - name: Target branch
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          if [ "$BASE" = main ] && { [ "$HEAD" != staging ] || [ "$SAME_REPO" != true ]; }; then
+            echo "::error::main only takes the promotion PR from staging. Retarget this PR: gh pr edit ${{ github.event.pull_request.number }} --base staging"
+            exit 1
+          fi
+          echo "$HEAD -> $BASE OK"
+
+  label:
+    name: label
+    # Fork PRs get a read-only token: nothing to label there.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Label AI-authored PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          trailers=$(gh pr view "$PR" --repo "$REPO" --json commits --jq '.commits[].messageBody')
+          if grep -qiE '^co-authored-by: .*(claude|anthropic|copilot|codex|openai|cursor|devin|gemini|agent)' <<<"$trailers"; then
+            gh pr edit "$PR" --repo "$REPO" --add-label ai-agent
+            echo "Labelled ai-agent"
+          fi
