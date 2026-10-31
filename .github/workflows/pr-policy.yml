@@ -62,6 +62,5 @@ jobs:
         run: |
           trailers=$(gh pr view "$PR" --repo "$REPO" --json commits --jq '.commits[].messageBody')
           if grep -qiE '^co-authored-by: .*(claude|anthropic|copilot|codex|openai|cursor|devin|gemini|agent)' <<<"$trailers"; then
-            gh pr edit "$PR" --repo "$REPO" --add-label ai-agent
-            echo "Labelled ai-agent"
+            gh pr edit "$PR" --repo "$REPO" --add-label ai-agent               || echo "::warning::Could not add the ai-agent label: create it with scripts/labels.sh from brokspace/.github"
           fi
