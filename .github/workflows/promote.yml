@@ -59,6 +59,9 @@ jobs:
             gh pr edit "$number" --repo "$REPO" --body-file body.md
             echo "Refreshed #$number"
           else
-            gh pr create --repo "$REPO" --base main --head staging \
-              --title "release: promote staging to main" --body-file body.md --label release
+            url=$(gh pr create --repo "$REPO" --base main --head staging \
+              --title "release: promote staging to main" --body-file body.md)
+            echo "Opened $url"
+            gh pr edit "$url" --add-label release \
+              || echo "::warning::Could not add the release label: create it with scripts/labels.sh from brokspace/.github"
           fi
