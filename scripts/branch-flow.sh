@@ -28,13 +28,20 @@ if ! gh api "repos/$repo/branches/staging" --silent 2>/dev/null; then
   gh api "repos/$repo/git/refs" -f ref=refs/heads/staging -f sha="$sha" --silent
   echo "  created staging from main"
 fi
-gh api -X PATCH "repos/$repo" --silent \
-  -f default_branch=staging \
-  -F allow_squash_merge=true -F allow_merge_commit=true -F allow_rebase_merge=false \
-  -F allow_auto_merge=true -F delete_branch_on_merge=true \
-  -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=COMMIT_MESSAGES \
+settings=(
+  -f default_branch=staging
+  -F allow_squash_merge=true -F allow_merge_commit=true -F allow_rebase_merge=false
+  -F delete_branch_on_merge=true
+  -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=COMMIT_MESSAGES
   -f merge_commit_title=PR_TITLE -f merge_commit_message=PR_BODY
-echo "  default branch: staging; squash into staging, merge commits into main, auto-merge on"
+)
+# Auto-merge needs a public repository on GitHub Free.
+if gh api -X PATCH "repos/$repo" --silent "${settings[@]}" -F allow_auto_merge=true 2>/dev/null; then
+  echo "  default branch: staging; squash into staging, merge commits into main, auto-merge on"
+else
+  gh api -X PATCH "repos/$repo" --silent "${settings[@]}"
+  echo "  default branch: staging; squash into staging, merge commits into main (auto-merge unavailable)"
+fi
 
 # 2. GitHub Actions may open the promotion pull request.
 gh api -X PUT "repos/$repo/actions/permissions/workflow" --silent \
