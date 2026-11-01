@@ -1,0 +1,16 @@
+# This repository's own promotion. Other repositories call
+# brokspace/.github/.github/workflows/promote.yml@main (workflow-templates/).
+name: Promote
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  promote:
+    uses: ./.github/workflows/promote.yml
