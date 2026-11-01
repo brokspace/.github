@@ -1,0 +1,6 @@
+{
+  "name": "Brokspace promote",
+  "description": "Keeps the staging to main release PR open and marks staging commits as promotable.",
+  "iconName": "octicon rocket",
+  "categories": ["Automation"]
+}

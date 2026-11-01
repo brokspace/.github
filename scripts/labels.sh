@@ -32,6 +32,8 @@ label "good first issue" "7057ff" "Small, well scoped, a good entry point"
 label "help wanted"      "008672" "Maintainers would welcome a contribution"
 label "documentation"    "0075ca" "Docs only"
 label "dependencies"     "0366d6" "Dependency updates"
+label "ai-agent"         "8250df" "Written by a coding agent (set by the PR policy check)"
+label "release"          "ff8a3d" "The staging to main promotion PR"
 
 # Areas
 label "area:cli"          "c5def5" "brok CLI, setup and doctor"
