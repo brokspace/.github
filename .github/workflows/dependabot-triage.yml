@@ -1,0 +1,16 @@
+# This repository's own Dependabot triage. Other repositories call
+# brokspace/.github/.github/workflows/dependabot.yml@main (workflow-templates/).
+name: Dependabot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependabot:
+    uses: ./.github/workflows/dependabot.yml
+    secrets: inherit

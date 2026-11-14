@@ -2,7 +2,7 @@ name: Promote
 
 on:
   push:
-    branches: [staging]
+    branches: [staging, main]
 
 permissions:
   contents: read
@@ -12,3 +12,7 @@ permissions:
 jobs:
   promote:
     uses: brokspace/.github/.github/workflows/promote.yml@main
+    # true when the repository releases from v* tags (it has a release.yml).
+    with:
+      release: false
+    secrets: inherit

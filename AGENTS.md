@@ -6,13 +6,13 @@ Operating guide for coding agents working in `brokspace/.github`: the organizati
 
 ```text
 profile/            organization landing page (github.com/brokspace)
-.github/workflows/  reusable workflows: pr-policy.yml, promote.yml (+ this repository's callers)
+.github/workflows/  reusable workflows: pr-policy.yml, promote.yml, dependabot.yml (+ this repository's callers)
 workflow-templates/ the caller workflows other repositories copy
-scripts/            labels.sh, branch-flow.sh (run with an authenticated gh)
+scripts/            labels.sh, branch-flow.sh (run with an authenticated gh), release.mjs (used by promote.yml)
 *.md                default CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, SUPPORT
 ```
 
-Changes to `pr-policy.yml` and `promote.yml` affect every repository once they reach `main` (callers pin `@main`): keep job names stable, because rulesets require the `policy / title` check and the `staging` status by name.
+Changes to the reusable workflows and `scripts/release.mjs` affect every repository once they reach `main` (callers pin `@main`): keep job names stable, because rulesets require the `policy / title` check and the `staging` status by name.
 
 ## Git workflow
 
@@ -27,4 +27,4 @@ Changes to `pr-policy.yml` and `promote.yml` affect every repository once they r
   ```
 
 - If a check fails, fix it on the same branch and push again; auto-merge stays on. If you cannot fix it, say so in the PR and stop.
-- Do not open or merge PRs into `main`: the release PR is opened by the Promote workflow and merged by a maintainer.
+- Do not open or merge PRs into `main`, bump versions or push tags: the Promote workflow does all three (README, "Zero-touch releases").
