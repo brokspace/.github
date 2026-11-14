@@ -52,6 +52,8 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
+      # Read the PR's commits; a public repository allows it without, a private one does not.
+      contents: read
       pull-requests: write
     steps:
       - name: Label AI-authored PRs
