@@ -21,7 +21,7 @@ jobs:
           bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
           ./actionlint -color .github/workflows/*.yml
           # Templates are callers too; lint them as workflows.
-          mkdir -p /tmp/templates/.github/workflows
+          mkdir -p /tmp/templates/.github/workflows && git init -q /tmp/templates
           cp workflow-templates/*.yml /tmp/templates/.github/workflows/
           (cd /tmp/templates && "$GITHUB_WORKSPACE/actionlint" -color)
       - name: release.mjs
