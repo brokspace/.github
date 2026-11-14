@@ -1,17 +1,32 @@
-# Reusable promotion for every Brokspace repository, called on each push to
-# staging (see workflow-templates/promote.yml). It:
+# Reusable promotion and release flow for every Brokspace repository, called
+# on each push to staging and main (see workflow-templates/promote.yml).
 #
+# On staging:
 #   1. sets the `staging` commit status on the new staging head. The main
 #      ruleset requires it, so main only takes commits that went through
 #      staging;
-#   2. opens the release PR staging -> main, or refreshes its description with
-#      the commits waiting to be released.
+#   2. with `release: true`, when the Conventional Commits since the last tag
+#      call for a release (fix -> patch, feat -> minor, see
+#      scripts/release.mjs), opens the `chore: release X.Y.Z` PR into staging
+#      that bumps the version files and CHANGELOG.md, and waits for it;
+#   3. otherwise opens or refreshes the promotion PR staging -> main.
+# On main (`release: true`): tags vX.Y.Z when the version files are ahead of
+# the last tag. The tag runs the repository's own release.yml.
 #
-# Merging that PR (merge commit) is the release gate; tags are cut from main.
+# Zero touch: with the brokspace-bot GitHub App secrets (BROKSPACE_BOT_ID,
+# BROKSPACE_BOT_KEY; pass them with `secrets: inherit`) the PRs merge
+# themselves once their checks pass and the tag is pushed by the app, so the
+# workflows they trigger run. Without them, the flow stops at opening PRs, as
+# before: GITHUB_TOKEN merges and tags would trigger no workflows.
 name: Promote
 
 on:
   workflow_call:
+    inputs:
+      release:
+        description: Version, tag and release this repository from its commits (it needs a release.yml run by v* tags).
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -19,6 +34,7 @@ permissions:
 jobs:
   promote:
     name: promote
+    if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     permissions:
       # Read the compare API; a public repository allows it without, a private one does not.
@@ -29,17 +45,90 @@ jobs:
       group: promote-${{ github.repository }}
       cancel-in-progress: true
     env:
-      GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       SHA: ${{ github.sha }}
+      HAS_BOT: ${{ secrets.BROKSPACE_BOT_KEY != '' }}
     steps:
       - name: Mark the commit as promotable
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh api "repos/$REPO/statuses/$SHA" --silent \
             -f state=success -f context=staging \
             -f description="Went through staging: can be promoted to main"
 
-      - name: Open or refresh the release PR
+      - name: Bot token
+        id: bot
+        if: env.HAS_BOT == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BROKSPACE_BOT_ID }}
+          private-key: ${{ secrets.BROKSPACE_BOT_KEY }}
+
+      - name: Check out the repository
+        if: inputs.release
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ steps.bot.outputs.token || github.token }}
+
+      - name: Check out the release script
+        if: inputs.release
+        uses: actions/checkout@v7
+        with:
+          repository: brokspace/.github
+          ref: main
+          path: .brokspace-flow
+          sparse-checkout: scripts
+
+      - name: Plan the release
+        id: plan
+        if: inputs.release
+        run: node .brokspace-flow/scripts/release.mjs plan
+
+      # Without the bot, a version PR would get no CI (GITHUB_TOKEN events
+      # start no workflows): promote as before and say what is due.
+      - name: Note the release that is due
+        if: inputs.release && steps.plan.outputs.bump == 'true' && env.HAS_BOT != 'true'
+        run: echo "::notice::${{ steps.plan.outputs.next }} is due (${{ steps.plan.outputs.level }}). Add the brokspace-bot secrets to automate the version PR and the tag."
+
+      - name: Open or refresh the version PR
+        if: inputs.release && steps.plan.outputs.bump == 'true' && env.HAS_BOT == 'true'
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
+          NEXT: ${{ steps.plan.outputs.next }}
+          LEVEL: ${{ steps.plan.outputs.level }}
+          BOT_SLUG: ${{ steps.bot.outputs.app-slug }}
+        run: |
+          id=$(gh api "users/${BOT_SLUG}[bot]" --jq .id)
+          git config user.name "${BOT_SLUG}[bot]"
+          git config user.email "${id}+${BOT_SLUG}[bot]@users.noreply.github.com"
+          git switch -c release/next
+          node .brokspace-flow/scripts/release.mjs bump "$NEXT"
+          git commit -am "chore: release $NEXT"
+          git push --force origin release/next
+          {
+            echo "Releases **$NEXT** ($LEVEL, from the Conventional Commits since the last tag): bumps the version files and moves the changelog's Unreleased section under $NEXT."
+            echo
+            echo "Once it is merged and promoted to \`main\`, v$NEXT is tagged and the release workflow publishes it."
+            echo
+            echo "<sub>Kept up to date by the Promote workflow: every push to staging rebuilds this branch.</sub>"
+          } > body.md
+          number=$(gh pr list --repo "$REPO" --base staging --head release/next --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --repo "$REPO" --title "chore: release $NEXT" --body-file body.md
+            url="$number"
+          else
+            url=$(gh pr create --repo "$REPO" --base staging --head release/next --title "chore: release $NEXT" --body-file body.md)
+            gh pr edit "$url" --repo "$REPO" --add-label release || true
+          fi
+          echo "Version PR: $url"
+          gh pr merge "$url" --repo "$REPO" --auto --squash
+
+      - name: Open or refresh the promotion PR
+        if: ${{ !(inputs.release && steps.plan.outputs.bump == 'true' && env.HAS_BOT == 'true') }}
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token || github.token }}
         run: |
           compare=$(gh api "repos/$REPO/compare/main...$SHA")
           ahead=$(jq -r .ahead_by <<<"$compare")
@@ -52,7 +141,11 @@ jobs:
             echo
             jq -r '.commits[] | select(.parents | length == 1) | "- \(.commit.message | split("\n")[0]) (\(.sha[0:7]))"' <<<"$compare"
             echo
-            echo "Merge with **Create a merge commit** once the checks are green. Then cut a release from \`main\` if needed."
+            if [ "$HAS_BOT" = true ]; then
+              echo "Merges itself (merge commit) once the checks pass."
+            else
+              echo "Merge with **Create a merge commit** once the checks are green. Then cut a release from \`main\` if needed."
+            fi
             echo
             echo "<sub>Kept up to date by the Promote workflow.</sub>"
           } > body.md
@@ -60,10 +153,65 @@ jobs:
           if [ -n "$number" ]; then
             gh pr edit "$number" --repo "$REPO" --body-file body.md
             echo "Refreshed #$number"
+            url="$number"
           else
             url=$(gh pr create --repo "$REPO" --base main --head staging \
               --title "release: promote staging to main" --body-file body.md)
             echo "Opened $url"
-            gh pr edit "$url" --add-label release \
+            gh pr edit "$url" --repo "$REPO" --add-label release \
               || echo "::warning::Could not add the release label: create it with scripts/labels.sh from brokspace/.github"
           fi
+          if [ "$HAS_BOT" = true ]; then
+            # Private repositories on GitHub Free have no auto-merge (and no
+            # required checks): merge right away there.
+            gh pr merge "$url" --repo "$REPO" --auto --merge || gh pr merge "$url" --repo "$REPO" --merge
+          fi
+
+  tag:
+    name: tag
+    if: inputs.release && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: tag-${{ github.repository }}
+    env:
+      HAS_BOT: ${{ secrets.BROKSPACE_BOT_KEY != '' }}
+    steps:
+      - name: Bot token
+        id: bot
+        if: env.HAS_BOT == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BROKSPACE_BOT_ID }}
+          private-key: ${{ secrets.BROKSPACE_BOT_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ steps.bot.outputs.token || github.token }}
+
+      - uses: actions/checkout@v7
+        with:
+          repository: brokspace/.github
+          ref: main
+          path: .brokspace-flow
+          sparse-checkout: scripts
+
+      - name: Plan the release
+        id: plan
+        run: node .brokspace-flow/scripts/release.mjs plan
+
+      - name: Tag the release
+        if: steps.plan.outputs.release == 'true' && steps.plan.outputs.bump == 'false'
+        env:
+          NEXT: ${{ steps.plan.outputs.next }}
+          BOT_SLUG: ${{ steps.bot.outputs.app-slug }}
+        run: |
+          if [ "$HAS_BOT" != true ]; then
+            echo "::notice::v$NEXT is ready to tag. Without the brokspace-bot secrets a tag pushed from here would not start the release workflow: push it yourself (git tag -a v$NEXT -m v$NEXT origin/main && git push origin v$NEXT)."
+            exit 0
+          fi
+          git config user.name "${BOT_SLUG}[bot]"
+          git config user.email "${BOT_SLUG}[bot]@users.noreply.github.com"
+          git tag -a "v$NEXT" -m "v$NEXT" "$GITHUB_SHA"
+          git push origin "v$NEXT"
+          echo "Tagged v$NEXT" | tee -a "$GITHUB_STEP_SUMMARY"

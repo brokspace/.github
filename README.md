@@ -9,8 +9,9 @@ Organization-wide configuration for [brokspace](https://github.com/brokspace).
 | `.github/pull_request_template.md` | Default pull request template |
 | `scripts/labels.sh` | Creates or updates the shared issue labels (triage roles, categories, areas) on a repository |
 | `scripts/branch-flow.sh` | Applies the staging / main branch flow (default branch, merge settings, rulesets) to a repository |
-| `.github/workflows/pr-policy.yml`, `promote.yml` | Reusable workflows every repository calls: PR checks and the staging to main promotion |
-| `workflow-templates/` | The two caller workflows, offered under Actions > New workflow in every repository |
+| `scripts/release.mjs` | Versioning from Conventional Commits: plans the next release and bumps the version files and changelog |
+| `.github/workflows/pr-policy.yml`, `promote.yml`, `dependabot.yml` | Reusable workflows every repository calls: PR checks, promotion and releases, Dependabot triage |
+| `workflow-templates/` | The caller workflows, offered under Actions > New workflow in every repository |
 
 Repositories inherit the community health files automatically. Issue forms, caller workflows and `AGENTS.md` live in each repository because GitHub does not inherit them.
 
@@ -30,11 +31,50 @@ The script is idempotent: run it again after changing a color or description. La
 Every repository works the same way (details in [CONTRIBUTING.md](CONTRIBUTING.md#branches-and-pull-requests)):
 
 ```text
-feature branch --PR, squash--> staging --release PR, merge commit--> main --> tag vX.Y.Z
+feature branch --PR, squash--> staging --release PR, merge commit--> main --> tag vX.Y.Z --> release.yml
 ```
 
 - `staging` is the default branch. Nobody pushes to it: every change is a pull request with green CI and a Conventional Commits title, and merges itself once green (auto-merge).
-- `main` is the release branch. It only takes the release PR from `staging`, which the Promote workflow keeps open and up to date. Merging it is the release decision.
+- `main` is the release branch. It only takes the promotion PR from `staging`, which the Promote workflow opens and merges once its checks pass.
+
+## Zero-touch releases
+
+Nobody merges release PRs, bumps versions or pushes tags. On every push to `staging`, the Promote workflow reads the Conventional Commits since the last `v*` tag (`scripts/release.mjs`):
+
+| Commits since the last tag | Release |
+|---|---|
+| `feat` | minor |
+| `fix`, `perf`, `revert`, `build(deps)`, `chore(deps)` | patch |
+| `type!:` or a `BREAKING CHANGE:` footer | major (minor while the version is 0.x) |
+| only `docs`, `ci`, `test`, `refactor`, `chore`, `chore(deps-dev)`, ... | none |
+
+1. A release is due: it opens `chore: release X.Y.Z` into `staging`, which bumps the version files (`Cargo.toml` and `Cargo.lock`, `package.json` and `package-lock.json`, `shard.json`) and moves the changelog's `## [Unreleased]` section under `## [X.Y.Z]` (or writes it from the commits when it is empty). It merges itself once green.
+2. Staging is promoted: the promotion PR into `main` merges itself once green.
+3. On `main`, a version ahead of the last tag is tagged `vX.Y.Z`. The tag runs the repository's `release.yml`: binaries, GitHub release, crates.io, Marketplace and Open VSX.
+
+Dependabot patch and minor updates merge themselves once green (`dependabot.yml`); major updates get `ready-for-human` and wait for a review.
+
+Repositories opt into releases with `release: true` in their Promote caller; the others (website, examples) are only promoted.
+
+### The brokspace-bot GitHub App
+
+Pull requests, merges and tags made with the workflows' `GITHUB_TOKEN` start no other workflow, so the flow acts as **brokspace-bot**, a GitHub App of the organization. Without its secrets everything still works as before: PRs are opened and wait for a person, and the due version and tag are printed as notices.
+
+One-time setup by an organization owner:
+
+1. **Create the app**: github.com/organizations/brokspace/settings/apps/new. Name `brokspace-bot`, homepage `https://brokspace.org`, webhook off. Repository permissions: Contents, Pull requests, Workflows: **Read and write**; Commit statuses: **Read and write**; Metadata: Read. "Only on this account".
+2. **Generate a private key** (downloads a `.pem`) and note the **App ID**.
+3. **Install the app** on the organization, all repositories.
+4. **Save the secrets** for Actions and for Dependabot (Dependabot runs only see Dependabot secrets):
+
+   ```sh
+   for app in actions dependabot; do
+     gh secret set BROKSPACE_BOT_ID  --org brokspace --app $app --visibility all --body "<App ID>"
+     gh secret set BROKSPACE_BOT_KEY --org brokspace --app $app --visibility all < brokspace-bot.private-key.pem
+   done
+   ```
+
+Publishing secrets, also organization-wide: `CARGO_REGISTRY_TOKEN` (crates.io), `VSCE_PAT` (Visual Studio Marketplace), `OVSX_PAT` (Open VSX).
 
 To set up a new repository (or re-apply after changing its CI):
 
@@ -43,4 +83,4 @@ To set up a new repository (or re-apply after changing its CI):
 ./scripts/branch-flow.sh brokspace/<repo> "<required CI check>" ...
 ```
 
-then add the two caller workflows from `workflow-templates/` (Actions > New workflow shows them) and the "Git workflow" section of `AGENTS.md`. Organization rulesets need GitHub Team, so the script applies repository rulesets one repository at a time; private repositories need GitHub Pro or Team for them.
+then add the caller workflows from `workflow-templates/` (Actions > New workflow shows them) and the "Git workflow" section of `AGENTS.md`. Organization rulesets need GitHub Team, so the script applies repository rulesets one repository at a time; private repositories need GitHub Pro or Team for them.
