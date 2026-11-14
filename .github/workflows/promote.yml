@@ -21,6 +21,8 @@ jobs:
     name: promote
     runs-on: ubuntu-latest
     permissions:
+      # Read the compare API; a public repository allows it without, a private one does not.
+      contents: read
       pull-requests: write
       statuses: write
     concurrency:
