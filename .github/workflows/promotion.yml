@@ -4,7 +4,7 @@ name: Promote
 
 on:
   push:
-    branches: [staging]
+    branches: [staging, main]
 
 permissions:
   contents: read
@@ -14,3 +14,4 @@ permissions:
 jobs:
   promote:
     uses: ./.github/workflows/promote.yml
+    secrets: inherit

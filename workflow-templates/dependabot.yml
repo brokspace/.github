@@ -1,0 +1,14 @@
+name: Dependabot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependabot:
+    uses: brokspace/.github/.github/workflows/dependabot.yml@main
+    secrets: inherit

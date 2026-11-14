@@ -1,0 +1,43 @@
+# Checks the reusable workflows, templates and release script before they
+# reach main, where every Brokspace repository picks them up.
+name: Lint
+
+on:
+  pull_request:
+  push:
+    branches: [staging, main]
+
+permissions:
+  contents: read
+
+jobs:
+  workflows:
+    name: workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color .github/workflows/*.yml
+          # Templates are callers too; lint them as workflows.
+          mkdir -p /tmp/templates/.github/workflows
+          cp workflow-templates/*.yml /tmp/templates/.github/workflows/
+          (cd /tmp/templates && "$GITHUB_WORKSPACE/actionlint" -color)
+      - name: release.mjs
+        run: |
+          node --check scripts/release.mjs
+          git config --global user.email ci@example.com && git config --global user.name ci
+          dir=$(mktemp -d) && cd "$dir" && git init -q
+          printf '{\n  "name": "x",\n  "version": "0.1.0"\n}\n' > package.json
+          printf '# Changelog\n\n## [Unreleased]\n\n## [0.1.0] - 2026-01-01\n' > CHANGELOG.md
+          git add -A && git commit -qm "feat: first" && git tag v0.1.0
+          git commit -q --allow-empty -m "fix(core): a bug"
+          node "$GITHUB_WORKSPACE/scripts/release.mjs" plan | tee plan.txt
+          grep -qx 'next=0.1.1' plan.txt && grep -qx 'bump=true' plan.txt
+          git commit -q --allow-empty -m "feat!: a breaking feature"
+          node "$GITHUB_WORKSPACE/scripts/release.mjs" plan | grep -qx 'next=0.2.0'
+          node "$GITHUB_WORKSPACE/scripts/release.mjs" bump 0.2.0
+          grep -q '"version": "0.2.0"' package.json
+          grep -q '## \[0.2.0\]' CHANGELOG.md
+          grep -q -- '- A bug' CHANGELOG.md

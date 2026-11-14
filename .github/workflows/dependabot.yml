@@ -1,0 +1,66 @@
+# Reusable Dependabot triage for every Brokspace repository, called on its
+# pull requests (see workflow-templates/dependabot.yml):
+#
+#   - patch and minor updates merge themselves (squash) once the required
+#     checks pass;
+#   - major updates get the `ready-for-human` label and wait for a review.
+#
+# The merge is done by the brokspace-bot GitHub App so that the push to
+# staging starts CI and the Promote workflow (a GITHUB_TOKEN merge would
+# start neither). Dependabot runs only see Dependabot secrets: set
+# BROKSPACE_BOT_ID and BROKSPACE_BOT_KEY there too
+# (gh secret set ... --org brokspace --app dependabot --visibility all).
+name: Dependabot
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  triage:
+    name: triage
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      PR: ${{ github.event.pull_request.html_url }}
+      HAS_BOT: ${{ secrets.BROKSPACE_BOT_KEY != '' }}
+    steps:
+      - name: Read the update
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ github.token }}
+
+      - name: Bot token
+        id: bot
+        if: env.HAS_BOT == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BROKSPACE_BOT_ID }}
+          private-key: ${{ secrets.BROKSPACE_BOT_KEY }}
+
+      - name: Merge patch and minor updates once the checks pass
+        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
+          UPDATE: ${{ steps.meta.outputs.update-type }}
+        run: |
+          if [ "$HAS_BOT" != true ]; then
+            echo "::notice::$UPDATE: would auto-merge, but the brokspace-bot Dependabot secrets are not set"
+            exit 0
+          fi
+          gh pr merge "$PR" --auto --squash
+          echo "$UPDATE: auto-merge on" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Leave major updates for a review
+        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr edit "$PR" --add-label ready-for-human || true
+          echo "Major update: waiting for a review" >> "$GITHUB_STEP_SUMMARY"

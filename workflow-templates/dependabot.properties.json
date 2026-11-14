@@ -1,0 +1,6 @@
+{
+  "name": "Brokspace Dependabot",
+  "description": "Merges Dependabot patch and minor updates once CI passes; labels major updates for review.",
+  "iconName": "octicon package-dependencies",
+  "categories": ["Automation"]
+}
