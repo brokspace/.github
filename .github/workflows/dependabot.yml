@@ -32,14 +32,14 @@ jobs:
     steps:
       - name: Read the update
         id: meta
-        uses: dependabot/fetch-metadata@v2
+        uses: dependabot/fetch-metadata@v3
         with:
           github-token: ${{ github.token }}
 
       - name: Bot token
         id: bot
         if: env.HAS_BOT == 'true'
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.BROKSPACE_BOT_ID }}
           private-key: ${{ secrets.BROKSPACE_BOT_KEY }}
