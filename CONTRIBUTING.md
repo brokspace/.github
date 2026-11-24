@@ -30,4 +30,12 @@ Pull requests written by coding agents follow the same rules. They carry a `Co-A
 
 Coding agents: every repository has an `AGENTS.md` with its conventions and commands. Brokspace's built-in skills (`brok skill export`) encode the same workflow.
 
+## Licensing of contributions
+
+Brokspace code is licensed `MIT OR Apache-2.0`. Unless you state otherwise, a contribution you submit is licensed under both, at the user's option, without additional terms or conditions (the inbound = outbound rule of Apache-2.0, section 5). We do not require a CLA or a sign-off. Only contribute work you have the right to license this way, and keep the copyright and license notices of any code you copy, which must be compatible with these terms. Each repository carries `LICENSE-MIT` and `LICENSE-APACHE`.
+
+## Name and logo
+
+The code license does not cover the Brokspace name or logo; see [TRADEMARKS.md](TRADEMARKS.md).
+
 Questions go to [Discussions](https://github.com/brokspace/brok/discussions). Participation is governed by our [Code of Conduct](CODE_OF_CONDUCT.md).
