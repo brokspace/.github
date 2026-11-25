@@ -13,6 +13,12 @@
 # On main (`release: true`): tags vX.Y.Z when the version files are ahead of
 # the last tag. The tag runs the repository's own release.yml.
 #
+# Release window: the version PR is opened and refreshed on every push to
+# staging, but it is only set to merge when the caller runs on a schedule or by
+# hand (`workflow_dispatch`). Commits accumulate until then, so a repository
+# publishes at most one version per window instead of one per merged PR. While
+# a version is due, the promotion waits for it.
+#
 # Zero touch: with the brokspace-bot GitHub App secrets (BROKSPACE_BOT_ID,
 # BROKSPACE_BOT_KEY; pass them with `secrets: inherit`) the PRs merge
 # themselves once their checks pass and the tag is pushed by the app, so the
@@ -48,6 +54,7 @@ jobs:
       REPO: ${{ github.repository }}
       SHA: ${{ github.sha }}
       HAS_BOT: ${{ secrets.BROKSPACE_BOT_KEY != '' }}
+      EVENT: ${{ github.event_name }}
     steps:
       - name: Mark the commit as promotable
         env:
@@ -123,7 +130,11 @@ jobs:
             gh pr edit "$url" --repo "$REPO" --add-label release || true
           fi
           echo "Version PR: $url"
-          gh pr merge "$url" --repo "$REPO" --auto --squash
+          if [ "$EVENT" = push ]; then
+            echo "Version PR $url waits for the next release window (the schedule, or run Promote by hand)." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            gh pr merge "$url" --repo "$REPO" --auto --squash
+          fi
 
       - name: Open or refresh the promotion PR
         if: ${{ !(inputs.release && steps.plan.outputs.bump == 'true' && env.HAS_BOT == 'true') }}
