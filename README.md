@@ -48,7 +48,7 @@ Nobody merges release PRs, bumps versions or pushes tags. On every push to `stag
 | `type!:` or a `BREAKING CHANGE:` footer | major (minor while the version is 0.x) |
 | only `docs`, `ci`, `test`, `refactor`, `chore`, `chore(deps-dev)`, ... | none |
 
-1. A release is due: it opens `chore: release X.Y.Z` into `staging`, which bumps the version files (`Cargo.toml` and `Cargo.lock`, `package.json` and `package-lock.json`, `shard.json`) and moves the changelog's `## [Unreleased]` section under `## [X.Y.Z]` (or writes it from the commits when it is empty). It merges itself once green.
+1. A release is due: it opens `chore: release X.Y.Z` into `staging` (and refreshes it on every push), which bumps the version files (`Cargo.toml` and `Cargo.lock`, `package.json` and `package-lock.json`, `shard.json`) and moves the changelog's `## [Unreleased]` section under `## [X.Y.Z]` (or writes it from the commits when it is empty). It is merged only in the **release window**: the daily scheduled run of Promote (12:00 UTC) or a manual run (Actions > Promote > Run workflow). Until then commits accumulate, so a repository publishes at most one version a day, however many PRs merged. It merges itself once green.
 2. Staging is promoted: the promotion PR into `main` merges itself once green.
 3. On `main`, a version ahead of the last tag is tagged `vX.Y.Z`. The tag runs the repository's `release.yml`: binaries, GitHub release, crates.io, Marketplace and Open VSX.
 
@@ -74,7 +74,7 @@ One-time setup by an organization owner:
    done
    ```
 
-Publishing secrets, also organization-wide: `CARGO_REGISTRY_TOKEN` (crates.io), `VSCE_PAT` (Visual Studio Marketplace), `OVSX_PAT` (Open VSX).
+Publishing needs no stored token: crates.io, the Visual Studio Marketplace and Open VSX use Trusted Publishing (OIDC) tied to each repository's `release.yml` and, for the extension, the `marketplace-production` environment. `CARGO_REGISTRY_TOKEN` remains only as an optional fallback in repositories that have not registered a trusted publisher yet (see `docs/publishing.md` in `brokspace/brok`).
 
 To set up a new repository (or re-apply after changing its CI):
 

@@ -3,6 +3,11 @@ name: Promote
 on:
   push:
     branches: [staging, main]
+  # The release window: a version PR merges (and the release follows) only
+  # when this runs, so many merged PRs make one version. Daily at 12:00 UTC.
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
